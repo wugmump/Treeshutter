@@ -11,8 +11,8 @@ if [[ ! -f "./creds.txt" ]]; then
 fi
 
 # creds.txt must define:
-#   SSH_USER=<username>
-#   SSH_PASS=<password>
+#   SSH_USER=...
+#   SSH_PASS=...
 source ./creds.txt
 echo "Using SSH_USER=${SSH_USER}"
 
@@ -51,7 +51,7 @@ set pass $env(SSH_PASS)
 # Start SSH session
 spawn ssh -tt -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "$user@$host"
 
-# Handle login prompts
+# Handle prompts and land at exec prompt
 expect {
     "Username:" {
         send "$user\r"
@@ -73,56 +73,59 @@ expect {
     "#" {}
 }
 
-# We're at exec prompt (>, #)
-
 # Enter config mode
 send "conf t\r"
 expect "#"
 
-# int range gi1/0/1-40
+# === gi1/0/1-40 ===
 send "int range gi1/0/1-40\r"
 expect "#"
 send "shut\r"
 expect "#"
 
-# wait 5 sec
+# wait 5 seconds
 after 5000
 
 send "no shut\r"
 expect "#"
 
-# te1/0/41-46
+# === te1/0/41-46 ===
 send "int range te1/0/41-46\r"
 expect "#"
 send "shut\r"
 expect "#"
 
-# wait 5 sec
+# wait 5 seconds
 after 5000
 
-# gi2/0/1-40
+send "no shut\r"
+expect "#"
+
+# === gi2/0/1-40 ===
 send "int range gi2/0/1-40\r"
 expect "#"
 send "shut\r"
 expect "#"
 
-# wait 5 sec
+# wait 5 seconds
 after 5000
 
 send "no shut\r"
 expect "#"
 
-# te2/0/41-46
+# === te2/0/41-46 ===
 send "int range te2/0/41-46\r"
 expect "#"
+send "shut\r"
+expect "#"
 
-# wait 5 sec
+# wait 5 seconds
 after 5000
 
 send "no shut\r"
 expect "#"
 
-# exit config & logout
+# exit config mode and logout
 send "end\r"
 expect "#"
 send "exit\r"
