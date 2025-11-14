@@ -10,7 +10,10 @@ if [[ ! -f "./creds.txt" ]]; then
   exit 1
 fi
 
-source ./creds.txt   # defines $SSH_USER and $SSH_PASS
+# creds.txt must define:
+#   SSH_USER=<username>
+#   SSH_PASS=<password>
+source ./creds.txt
 echo "Using SSH_USER=${SSH_USER}"
 
 ########################################
@@ -33,7 +36,7 @@ while IFS= read -r HOST || [[ -n "$HOST" ]]; do
 
   echo ">>> Processing ${HOST} as ${SSH_USER}..."
 
-  # export vars so expect can see them
+  # make vars visible to expect
   export HOST
   export SSH_USER
   export SSH_PASS
@@ -48,7 +51,7 @@ set pass $env(SSH_PASS)
 # Start SSH session
 spawn ssh -tt -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "$user@$host"
 
-# Handle username/password prompts and land at exec prompt (">" or "#")
+# Handle login prompts
 expect {
     "Username:" {
         send "$user\r"
@@ -70,42 +73,56 @@ expect {
     "#" {}
 }
 
-# Now we're in exec mode
+# We're at exec prompt (>, #)
 
 # Enter config mode
 send "conf t\r"
 expect "#"
 
-# gi1/0/1-40 shut
+# int range gi1/0/1-40
 send "int range gi1/0/1-40\r"
 expect "#"
 send "shut\r"
 expect "#"
 
-# wait 5 seconds (on the Mac side)
+# wait 5 sec
 after 5000
 
-# gi1/0/1-40 no shut
 send "no shut\r"
 expect "#"
 
-# wait 5 seconds
+# te1/0/41-46
+send "int range te1/0/41-46\r"
+expect "#"
+send "shut\r"
+expect "#"
+
+# wait 5 sec
 after 5000
 
-# gi2/0/1-40 shut
+# gi2/0/1-40
 send "int range gi2/0/1-40\r"
 expect "#"
 send "shut\r"
 expect "#"
 
-# wait 5 seconds
+# wait 5 sec
 after 5000
 
-# gi2/0/1-40 no shut
 send "no shut\r"
 expect "#"
 
-# exit config mode and log out
+# te2/0/41-46
+send "int range te2/0/41-46\r"
+expect "#"
+
+# wait 5 sec
+after 5000
+
+send "no shut\r"
+expect "#"
+
+# exit config & logout
 send "end\r"
 expect "#"
 send "exit\r"
