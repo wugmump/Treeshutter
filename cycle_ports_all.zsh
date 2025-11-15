@@ -1,57 +1,74 @@
 #!/usr/bin/env zsh
 set -uo pipefail
+# -u = error on undefined vars
+# -o pipefail = pipeline errors propagate
 
-########################################
-# LOAD CREDS
-########################################
+###############################################################################
+#                        CONFIGURATION (EDIT THIS SECTION)
+###############################################################################
 
-if [[ ! -f "./creds.txt" ]]; then
-  echo "ERROR: creds.txt not found in current directory." >&2
-  exit 1
-fi
+# -------- Credentials --------
+SSH_USER="MCAADAdmin"
+SSH_PASS="XZw6vFzQRu"
 
-# creds.txt must define:
-#   SSH_USER=...
-#   SSH_PASS=...
-source ./creds.txt
+# -------- List of Switch IPs --------
+SWITCH_IPS=(
+  10.101.120.30
+  10.101.120.31
+  10.101.120.32
+  10.101.120.33
+  10.101.120.34
+  10.101.120.35
+  10.101.120.36
+  10.101.120.37
+  10.101.120.38
+  10.101.120.39
+  10.101.120.40
+  10.101.120.41
+  10.101.120.42
+)
+
+# -------- Global wait time (milliseconds) --------
+# Example: 3000 = 3 seconds
+WAIT_TIME=3000
+
+
+###############################################################################
+#                        START OF SCRIPT (NO EDITS BELOW)
+###############################################################################
+
 echo "Using SSH_USER=${SSH_USER}"
+echo "Wait time: ${WAIT_TIME} ms"
+echo "Switch count: ${#SWITCH_IPS[@]}"
+echo
 
-########################################
-# HOST LIST
-########################################
+# Loop all switches in parallel
+for HOST in "${SWITCH_IPS[@]}"; do
+(
+    echo ">>> Processing ${HOST} ..."
 
-HOST_FILE="switches.txt"
+    # Export for Expect
+    export HOST
+    export SSH_USER
+    export SSH_PASS
+    export WAIT_TIME
 
-if [[ ! -f "$HOST_FILE" ]]; then
-  echo "ERROR: $HOST_FILE not found." >&2
-  exit 1
-fi
-
-########################################
-# MAIN LOOP
-########################################
-
-while IFS= read -r HOST || [[ -n "$HOST" ]]; do
-  [[ -z "$HOST" ]] && continue
-
-  echo ">>> Processing ${HOST} as ${SSH_USER}..."
-
-  # make vars visible to expect
-  export HOST
-  export SSH_USER
-  export SSH_PASS
-
-  expect << 'EOF'
+    expect << 'EOF'
 set timeout 30
 
+# Read environment variables
 set host $env(HOST)
 set user $env(SSH_USER)
 set pass $env(SSH_PASS)
+set wait $env(WAIT_TIME)
 
 # Start SSH session
-spawn ssh -tt -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "$user@$host"
+spawn ssh -tt \
+    -o StrictHostKeyChecking=accept-new \
+    -o ConnectTimeout=5 \
+    "$user@$host"
 
-# Handle prompts and land at exec prompt
+# Handle login prompts
 expect {
     "Username:" {
         send "$user\r"
@@ -73,65 +90,59 @@ expect {
     "#" {}
 }
 
-# Enter config mode
+# Enter configuration mode
 send "conf t\r"
 expect "#"
 
-# === gi1/0/1-40 ===
+########## gi1/0/1-40 ##########
 send "int range gi1/0/1-40\r"
 expect "#"
 send "shut\r"
 expect "#"
-
-# wait 5 seconds
-after 5000
-
+after $wait
 send "no shut\r"
 expect "#"
 
-# === te1/0/41-46 ===
+########## te1/0/41-46 ##########
 send "int range te1/0/41-46\r"
 expect "#"
 send "shut\r"
 expect "#"
-
-# wait 5 seconds
-after 5000
-
+after $wait
 send "no shut\r"
 expect "#"
 
-# === gi2/0/1-40 ===
+########## gi2/0/1-40 ##########
 send "int range gi2/0/1-40\r"
 expect "#"
 send "shut\r"
 expect "#"
-
-# wait 5 seconds
-after 5000
-
+after $wait
 send "no shut\r"
 expect "#"
 
-# === te2/0/41-46 ===
+########## te2/0/41-46 ##########
 send "int range te2/0/41-46\r"
 expect "#"
 send "shut\r"
 expect "#"
-
-# wait 5 seconds
-after 5000
-
+after $wait
 send "no shut\r"
 expect "#"
 
-# exit config mode and logout
+# Exit config + logout
 send "end\r"
 expect "#"
 send "exit\r"
 expect eof
+
 EOF
 
-  echo ">>> Finished ${HOST}"
-  echo
-done < "$HOST_FILE"
+    echo ">>> Finished ${HOST}"
+    echo
+) &
+done
+
+# Wait for all background jobs to complete
+wait
+echo "All switches processed."
