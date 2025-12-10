@@ -30,7 +30,7 @@ SWITCH_IPS=(
 
 # -------- Global wait time (milliseconds) --------
 # Example: 3000 = 3 seconds
-WAIT_TIME=3000
+WAIT_TIME=5000
 
 
 ###############################################################################
